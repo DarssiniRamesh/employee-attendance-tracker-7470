@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from src.api.models import User, RoleEnum
-from src.api.main import SessionLocal
+from src.api.db import SessionLocal
 
 import os
 import secrets

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel, Field
 
-from src.api.main import SessionLocal
+from src.api.db import SessionLocal
 from src.api.models import User, Attendance, RoleEnum
 from src.api.auth import (
     get_current_active_admin_user,
