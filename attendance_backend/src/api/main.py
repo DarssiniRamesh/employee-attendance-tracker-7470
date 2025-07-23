@@ -9,6 +9,7 @@ from src.api.auth import (
     UserIn, UserOut, Token, get_password_hash, verify_password,
     create_access_token, get_user_by_username,
 )
+from src.api.dashboard import dashboard_router
 from fastapi.security import OAuth2PasswordRequestForm
 
 import os
@@ -31,7 +32,8 @@ app = FastAPI(
     version="0.1.0",
     openapi_tags=[
         {"name": "Health", "description": "Health check and diagnostics."},
-        {"name": "Auth", "description": "Authentication, registration, token endpoints."}
+        {"name": "Auth", "description": "Authentication, registration, token endpoints."},
+        {"name": "Dashboard", "description": "Dashboard statistics for both admins and employees based on role."}
     ]
 )
 
@@ -117,3 +119,4 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     return Token(access_token=access_token, token_type="bearer")
 
 app.include_router(auth_router)
+app.include_router(dashboard_router)
