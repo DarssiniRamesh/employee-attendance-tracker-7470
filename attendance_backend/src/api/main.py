@@ -25,28 +25,38 @@ def on_startup():
 
     Ensures all DB tables are created (no-op if already exist). Safe for repeated calls.
     Prints model/table schema status and any discrepancies at startup.
-    """
-    Base.metadata.create_all(bind=engine)
 
-    # Diagnostics: print schema for User and check table and constraints
+    Exception details and tracebacks are printed to server logs if DB/model setup fails,
+    to aid debugging of missing/misnamed tables or DB connection issues.
+    """
     import sys
-    from sqlalchemy import inspect
-    inspector = inspect(engine)
-    print("=== DB Startup Schema Diagnostics ===", file=sys.stderr)
-    # Check all expected tables:
-    expected_tables = ['users', 'attendance', 'token_blacklist']
-    missing_tables = [t for t in expected_tables if t not in inspector.get_table_names()]
-    if missing_tables:
-        print(f"[STARTUP ERROR] Missing tables: {missing_tables}", file=sys.stderr)
-    else:
-        print("All expected tables present: ", inspector.get_table_names(), file=sys.stderr)
-    # Check User fields and constraints
-    user_cols = inspector.get_columns('users')
-    col_names = [c['name'] for c in user_cols]
-    print("User table columns: ", col_names, file=sys.stderr)
-    for uc in inspector.get_unique_constraints('users'):
-        print("User table unique constraint: ", uc, file=sys.stderr)
-    print("=====================================", file=sys.stderr)
+    import traceback
+    try:
+        Base.metadata.create_all(bind=engine)
+
+        # Diagnostics: print schema for User and check table and constraints
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        print("=== DB Startup Schema Diagnostics ===", file=sys.stderr)
+        # Check all expected tables:
+        expected_tables = ['users', 'attendance', 'token_blacklist']
+        missing_tables = [t for t in expected_tables if t not in inspector.get_table_names()]
+        if missing_tables:
+            print(f"[STARTUP ERROR] Missing tables: {missing_tables}", file=sys.stderr)
+        else:
+            print("All expected tables present: ", inspector.get_table_names(), file=sys.stderr)
+        # Check User fields and constraints
+        user_cols = inspector.get_columns('users')
+        col_names = [c['name'] for c in user_cols]
+        print("User table columns: ", col_names, file=sys.stderr)
+        for uc in inspector.get_unique_constraints('users'):
+            print("User table unique constraint: ", uc, file=sys.stderr)
+        print("=====================================", file=sys.stderr)
+    except Exception as e:
+        print("[CRITICAL ERROR][STARTUP]: Exception during DB/model initialization", file=sys.stderr)
+        traceback.print_exc()
+        print(f"Exception details: {repr(e)}", file=sys.stderr)
+        # Optionally reraise or allow app to continue
 
 # PUBLIC_INTERFACE
 @app.get(
@@ -169,11 +179,13 @@ def register_user(
         # For unanticipated errors, log and provide a clear error message
         import traceback, sys
         print("Exception during registration:", file=sys.stderr)
-        traceback.print_exc()
+        tb_str = traceback.format_exc()
+        print(tb_str, file=sys.stderr)
         print(f"Exception details: {repr(e)}", file=sys.stderr)
+        # TEMP: return the traceback in the HTTP response for debugging (DO NOT DO IN PRODUCTION)
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error during registration. Error details logged: {str(e)}"
+            detail=f"Internal server error during registration. Exception details: {repr(e)}\nTraceback:\n{tb_str}"
         )
 
 # PUBLIC_INTERFACE
