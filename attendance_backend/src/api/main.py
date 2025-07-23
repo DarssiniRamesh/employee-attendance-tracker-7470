@@ -1,8 +1,7 @@
-from fastapi import FastAPI, APIRouter, Depends, status, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
+from src.api.app_factory import create_app
 from src.api.models import Base, User, RoleEnum
 from src.api.db import SessionLocal, engine
 from src.api.auth import (
@@ -15,45 +14,15 @@ from src.api.reporting import reporting_router
 from src.api.admin import admin_router
 from fastapi.security import OAuth2PasswordRequestForm
 
-# Database connection logic moved to db.py (see src/api/db.py)
-
-# PUBLIC_INTERFACE
-app = FastAPI(
-    title="Employee Attendance Tracker Backend",
-    description=(
-        "FastAPI backend with SQLite and role-based attendance management. "
-        "This API provides RESTful endpoints for user authentication, registration, attendance marking, "
-        "reporting, dashboards for employees/admins, and employee/admin management.\n\n"
-        "**Security:**\n"
-        "- All endpoints (except root, /auth/login, /auth/register) require authentication using JWT Bearer tokens.\n"
-        "- Role-based permissions are enforced using FastAPI Security dependencies.\n"
-        "- CORS is enabled for all origins to support frontend connections."
-    ),
-    version="0.1.0",
-    openapi_tags=[
-        {"name": "Health", "description": "Health check and diagnostics."},
-        {"name": "Auth", "description": "Authentication, registration, token endpoints (login/register)."},
-        {"name": "Dashboard", "description": "Dashboard statistics for both admins and employees based on role."},
-        {"name": "Attendance", "description": "Attendance marking and real-time status APIs."},
-        {"name": "Attendance Reporting", "description": "Attendance reporting, history, summaries, and CSV export."}
-    ]
-)
-
-# CORS is required for browser-based clients to access the REST API from a different origin.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Create FastAPI app as recommended (from factory)
+app = create_app()
 
 @app.on_event("startup")
 # PUBLIC_INTERFACE
 def on_startup():
     """
     Application startup event: Initialize database schema.
-    
+
     Ensures all DB tables are created (no-op if already exist). Safe for repeated calls.
     """
     Base.metadata.create_all(bind=engine)
@@ -80,9 +49,8 @@ def health_check():
     """
     return {"message": "Healthy"}
 
+# --- AUTH ROUTER (Registration/Login) ---
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
-
-# --- Registration endpoint ---
 
 # PUBLIC_INTERFACE
 @auth_router.post(
@@ -125,8 +93,6 @@ def register_user(user_in: UserIn, db: Session = Depends(SessionLocal)):
     db.commit()
     db.refresh(db_user)
     return db_user
-
-# --- Login endpoint ---
 
 # PUBLIC_INTERFACE
 @auth_router.post(
