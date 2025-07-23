@@ -63,21 +63,36 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
         "Returns the user object. Usernames must be unique."
     ),
 )
-def register_user(user_in: UserIn, db: Session = Depends(SessionLocal)):
+# PUBLIC_INTERFACE
+def register_user(
+    user_in: UserIn,
+    db: Session = Depends(SessionLocal),
+    local_kw: str = None,
+):
     """
     Register a new user.
 
     - **username**: Unique username
     - **password**: Plain text password (will be hashed)
     - **full_name**: Optional display name
+    - **local_kw**: (optional, query param) department/keyword. Ignored on backend.
 
     The first registered user is given admin role, others as employee.
 
     Raises:
-        - 400: Username already registered.
+        - 400: Username already registered or unexpected input fields.
     Returns:
         The created user object.
     """
+    # If local_kw is provided in the request body (as a field in user_in), raise 400.
+    posted_fields = set(user_in.__dict__.keys())
+    expected_fields = set(['username', 'password', 'full_name'])
+    unexpected_payload_fields = posted_fields - expected_fields
+    if "local_kw" in unexpected_payload_fields:
+        raise HTTPException(
+            status_code=400,
+            detail="local_kw must be sent as a query parameter, not in JSON body"
+        )
     if get_user_by_username(db, user_in.username):
         raise HTTPException(status_code=400, detail="Username already registered.")
     user_count = db.query(User).count()
@@ -92,6 +107,7 @@ def register_user(user_in: UserIn, db: Session = Depends(SessionLocal)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    # Ignore local_kw (query param) completely for now. Return created user.
     return db_user
 
 # PUBLIC_INTERFACE
