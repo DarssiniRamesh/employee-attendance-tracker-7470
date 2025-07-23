@@ -11,6 +11,7 @@ from src.api.auth import (
 )
 from src.api.dashboard import dashboard_router
 from src.api.attendance import attendance_router
+from src.api.reporting import reporting_router
 from fastapi.security import OAuth2PasswordRequestForm
 
 import os
@@ -34,7 +35,9 @@ app = FastAPI(
     openapi_tags=[
         {"name": "Health", "description": "Health check and diagnostics."},
         {"name": "Auth", "description": "Authentication, registration, token endpoints."},
-        {"name": "Dashboard", "description": "Dashboard statistics for both admins and employees based on role."}
+        {"name": "Dashboard", "description": "Dashboard statistics for both admins and employees based on role."},
+        {"name": "Attendance", "description": "Attendance marking and real-time status APIs."},
+        {"name": "Attendance Reporting", "description": "Attendance reporting, history, summaries, and CSV export for HR/admin/employee."}
     ]
 )
 
@@ -122,3 +125,4 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(attendance_router)
+app.include_router(reporting_router)
