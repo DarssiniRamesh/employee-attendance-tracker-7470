@@ -176,16 +176,34 @@ def register_user(
         )
     except Exception as e:
         db.rollback()
-        # For unanticipated errors, log and provide a clear error message
+        # For unanticipated errors, print and write traceback to console and temp file for diagnostics
         import traceback, sys
         print("Exception during registration:", file=sys.stderr)
         tb_str = traceback.format_exc()
         print(tb_str, file=sys.stderr)
         print(f"Exception details: {repr(e)}", file=sys.stderr)
+        # Additionally, write the full traceback and error context to a temp file
+        diagnostics_path = "/tmp/auth_register_exception.log"
+        try:
+            with open(diagnostics_path, "a") as f:
+                f.write("="*32 + "\n")
+                f.write("Exception during /auth/register\n")
+                f.write(tb_str)
+                f.write(f"Exception details: {repr(e)}\n")
+                f.write(f"Request fields: {user_in.__dict__}\n")
+                f.write("Client Info: (unavailable; add request if needed)\n")
+                f.write("="*32 + "\n")
+        except Exception as write_err:
+            # Print file write errors, too, but do not fail the API for it
+            print(f"Error writing diagnostics file: {write_err}", file=sys.stderr)
         # TEMP: return the traceback in the HTTP response for debugging (DO NOT DO IN PRODUCTION)
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error during registration. Exception details: {repr(e)}\nTraceback:\n{tb_str}"
+            detail=(
+                f"Internal server error during registration. "
+                f"Exception details: {repr(e)}\nTraceback:\n{tb_str}\n"
+                f"Check backend console log or /tmp/auth_register_exception.log for full traceback/context."
+            )
         )
 
 # PUBLIC_INTERFACE
