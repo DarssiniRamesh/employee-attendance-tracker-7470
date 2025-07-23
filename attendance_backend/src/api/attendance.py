@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 from typing import Optional
 
-from src.api.main import SessionLocal
+from src.api.db import SessionLocal
 from src.api.models import Attendance, User
 from src.api.auth import get_current_active_employee_user, get_current_active_admin_user
 

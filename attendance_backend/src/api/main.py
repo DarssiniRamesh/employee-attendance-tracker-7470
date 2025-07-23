@@ -1,10 +1,10 @@
 from fastapi import FastAPI, APIRouter, Depends, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session
 
 from src.api.models import Base, User, RoleEnum
+from src.api.db import SessionLocal, engine
 from src.api.auth import (
     UserIn, UserOut, Token, get_password_hash, verify_password,
     create_access_token, get_user_by_username,
@@ -15,20 +15,7 @@ from src.api.reporting import reporting_router
 from src.api.admin import admin_router
 from fastapi.security import OAuth2PasswordRequestForm
 
-import os
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "sqlite:///./attendance.db"
-)  # Default local SQLite file
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-    future=True,
-    echo=False,
-)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
+# Database connection logic moved to db.py (see src/api/db.py)
 
 # PUBLIC_INTERFACE
 app = FastAPI(
