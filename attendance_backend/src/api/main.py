@@ -10,6 +10,7 @@ from src.api.auth import (
     create_access_token, get_user_by_username,
 )
 from src.api.dashboard import dashboard_router
+from src.api.attendance import attendance_router
 from fastapi.security import OAuth2PasswordRequestForm
 
 import os
@@ -120,3 +121,4 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
+app.include_router(attendance_router)
