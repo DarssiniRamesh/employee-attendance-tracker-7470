@@ -12,6 +12,7 @@ from src.api.auth import (
 from src.api.dashboard import dashboard_router
 from src.api.attendance import attendance_router
 from src.api.reporting import reporting_router
+from src.api.admin import admin_router
 from fastapi.security import OAuth2PasswordRequestForm
 
 import os
@@ -126,3 +127,4 @@ app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(attendance_router)
 app.include_router(reporting_router)
+app.include_router(admin_router)
