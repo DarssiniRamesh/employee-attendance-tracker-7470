@@ -29,6 +29,11 @@ class User(Base):
         - role: User role (admin/employee).
         - is_active: Status.
         - created_at: When the user was created.
+
+    CRITICAL:
+    Do NOT remove or change the unique=True and index=True properties on username,
+    or the unique constraint on username at the DB layer.
+    If you modify the username column or User table, ensure the DB is migrated properly and check all migrations for unique/index.
     """
     __tablename__ = "users"
 

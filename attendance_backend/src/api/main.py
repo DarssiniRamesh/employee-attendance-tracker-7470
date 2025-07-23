@@ -24,8 +24,29 @@ def on_startup():
     Application startup event: Initialize database schema.
 
     Ensures all DB tables are created (no-op if already exist). Safe for repeated calls.
+    Prints model/table schema status and any discrepancies at startup.
     """
     Base.metadata.create_all(bind=engine)
+
+    # Diagnostics: print schema for User and check table and constraints
+    import sys
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    print("=== DB Startup Schema Diagnostics ===", file=sys.stderr)
+    # Check all expected tables:
+    expected_tables = ['users', 'attendance', 'token_blacklist']
+    missing_tables = [t for t in expected_tables if t not in inspector.get_table_names()]
+    if missing_tables:
+        print(f"[STARTUP ERROR] Missing tables: {missing_tables}", file=sys.stderr)
+    else:
+        print("All expected tables present: ", inspector.get_table_names(), file=sys.stderr)
+    # Check User fields and constraints
+    user_cols = inspector.get_columns('users')
+    col_names = [c['name'] for c in user_cols]
+    print("User table columns: ", col_names, file=sys.stderr)
+    for uc in inspector.get_unique_constraints('users'):
+        print("User table unique constraint: ", uc, file=sys.stderr)
+    print("=====================================", file=sys.stderr)
 
 # PUBLIC_INTERFACE
 @app.get(
@@ -114,30 +135,45 @@ def register_user(
         db.commit()
         db.refresh(db_user)
         # Ignore local_kw (query param) completely for now. Return created user.
+        # Post-check: Ensure that the username is unique as per DB model & index.
+        existing_count = db.query(User).filter(User.username == user_in.username).count()
+        if existing_count > 1:
+            import sys
+            print(f"CRITICAL ERROR: Duplicate usernames detected in DB after supposed unique constraint. Count: {existing_count}, username: {user_in.username}", file=sys.stderr)
+            raise HTTPException(
+                status_code=500,
+                detail="Duplicate usernames detected after registration. DB schema may be corrupted.",
+            )
         return db_user
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        # Defensive: if there's a DB constraint violation, convert to a 409 conflict
+        # Defensive: if there's a DB constraint violation, convert to 409 conflict + print
+        import sys
+        print("IntegrityError during registration:", str(e), file=sys.stderr)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Database integrity error: possible duplicate username or invalid schema. See server logs."
+            detail=f"Database integrity error: possible duplicate username or invalid schema. "
+                   f"See server logs. Error: {str(e)}"
         )
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.rollback()
+        import sys
+        print("SQLAlchemyError during registration:", str(e), file=sys.stderr)
         # Generic database error
         raise HTTPException(
             status_code=500,
-            detail="A database error occurred during registration. See server logs."
+            detail=f"A database error occurred during registration. See server logs. Error: {str(e)}"
         )
-    except Exception:
+    except Exception as e:
         db.rollback()
         # For unanticipated errors, log and provide a clear error message
         import traceback, sys
         print("Exception during registration:", file=sys.stderr)
         traceback.print_exc()
+        print(f"Exception details: {repr(e)}", file=sys.stderr)
         raise HTTPException(
             status_code=500,
-            detail="Internal server error during registration. Error details logged."
+            detail=f"Internal server error during registration. Error details logged: {str(e)}"
         )
 
 # PUBLIC_INTERFACE
