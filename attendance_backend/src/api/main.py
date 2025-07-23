@@ -80,10 +80,14 @@ def register_user(
     The first registered user is given admin role, others as employee.
 
     Raises:
-        - 400: Username already registered or unexpected input fields.
+        - 400: Username already registered, bad field, or unexpected input.
+        - 409: Database conflict such as username exists (from DB constraint).
+        - 500: Unanticipated server/database errors (descriptive).
     Returns:
         The created user object.
     """
+    from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
     # If local_kw is provided in the request body (as a field in user_in), raise 400.
     posted_fields = set(user_in.__dict__.keys())
     expected_fields = set(['username', 'password', 'full_name'])
@@ -95,20 +99,46 @@ def register_user(
         )
     if get_user_by_username(db, user_in.username):
         raise HTTPException(status_code=400, detail="Username already registered.")
-    user_count = db.query(User).count()
-    user_role = RoleEnum.ADMIN if user_count == 0 else RoleEnum.EMPLOYEE
-    db_user = User(
-        username=user_in.username,
-        hashed_password=get_password_hash(user_in.password),
-        full_name=user_in.full_name,
-        role=user_role,
-        is_active=True
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    # Ignore local_kw (query param) completely for now. Return created user.
-    return db_user
+
+    try:
+        user_count = db.query(User).count()
+        user_role = RoleEnum.ADMIN if user_count == 0 else RoleEnum.EMPLOYEE
+        db_user = User(
+            username=user_in.username,
+            hashed_password=get_password_hash(user_in.password),
+            full_name=user_in.full_name,
+            role=user_role,
+            is_active=True
+        )
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        # Ignore local_kw (query param) completely for now. Return created user.
+        return db_user
+    except IntegrityError:
+        db.rollback()
+        # Defensive: if there's a DB constraint violation, convert to a 409 conflict
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Database integrity error: possible duplicate username or invalid schema. See server logs."
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        # Generic database error
+        raise HTTPException(
+            status_code=500,
+            detail="A database error occurred during registration. See server logs."
+        )
+    except Exception:
+        db.rollback()
+        # For unanticipated errors, log and provide a clear error message
+        import traceback, sys
+        print("Exception during registration:", file=sys.stderr)
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error during registration. Error details logged."
+        )
 
 # PUBLIC_INTERFACE
 @auth_router.post(
